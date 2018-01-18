@@ -97,7 +97,6 @@ async def handle_new_attack(attack, players):
         attacker['mapPosition'], attacker['townhallLevel'], attacker['name'],
         defender['mapPosition'], defender['townhallLevel'], defender['name'],
         ':star:' * attack['stars'], attack['destructionPercentage'])
-    defender['needRefresh'] = True
     await client.send_message(g_ops_datas.restricted_channel, message_content)
 
 async def handle_new_defense(attack, players):
@@ -161,6 +160,7 @@ async def refresh_current_war():
         for attack in member['attacks']:
             if attack['order'] > g_ops_datas.attack_log_offset:
                 async_tasks.append(handle_new_attack(attack, tag_2_player))
+                tag_2_player[attack['defenderTag']]['needRefresh'] = True
                 if new_offset < attack['order']:
                     new_offset = attack['order']
 
@@ -170,6 +170,7 @@ async def refresh_current_war():
         for attack in member['attacks']:
             if attack['order'] > g_ops_datas.attack_log_offset:
                 async_tasks.append(handle_new_defense(attack, tag_2_player))
+                tag_2_player[attack['defenderTag']]['needRefresh'] = True
                 if new_offset < attack['order']:
                     new_offset = attack['order']
 
