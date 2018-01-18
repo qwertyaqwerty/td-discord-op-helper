@@ -113,6 +113,9 @@ async def refresh_war_channel(player):
     if player['side'] != 'opponent':
         return
 
+    print('refreshing channel for player...')
+    print(json.dumps(player, indent=4))
+
     stars = player['bestOpponentAttack']['stars']
     cleared = stars == 3 or (player['townhallLevel'] == 11 and stars >= 2)
     defs = player['opponentAttacks']
@@ -125,6 +128,7 @@ async def refresh_war_channel(player):
     pos = player['mapPosition']
 
     new_name = '{}-th{}{}'.format(pos, player['townhallLevel'], status)
+    await client.send_message(g_ops_datas.restricted_channel, 'Changing channel {} to {}'.format(g_ops_datas.channels[pos-1].name, name))
 
     global g_ops_datas
     await client.edit_channel(g_ops_datas.channels[pos - 1], name=new_name)
@@ -170,10 +174,13 @@ async def refresh_current_war():
                     new_offset = attack['order']
 
     g_ops_datas.attack_log_offset = new_offset
+    print('update data complete, new_offset = {}'.format(new_offset))
 
     for tag in tag_2_player:
         player = tag_2_player[tag]
         if player['needRefresh']:
+            print('player need refresh: ')
+            print(json.dumps(player, indent=4))
             async_tasks.append(refresh_war_channel(player))
 
     await wait_task_list(async_tasks)
