@@ -87,8 +87,7 @@ def fetch_current_war():
     return response
 
 async def wait_task_list(task_list):
-    for task in task_list:
-        await task
+    asyncio.gather(*task_list)
 
 async def handle_new_attack(attack, players):
     attacker = players[attack['attackerTag']]
