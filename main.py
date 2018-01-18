@@ -5,6 +5,7 @@ import functools
 import requests
 import traceback
 import concurrent.futures
+import datetime
 
 CONFIG_FILE_PATH = 'config.json'
 CHECKPOINT_FILE_PATH = 'checkpoint.json'
@@ -97,7 +98,7 @@ async def handle_new_attack(attack, players):
         return
     attacker = players[attack['attackerTag']]
     defender = players[attack['defenderTag']]
-    message_content = '{}. th{} {} attacks {}. th{} {} for {} %{}'.format(
+    message_content = '{}. th{} {} attacks {}. th{} {} for {} {}%'.format(
         attacker['mapPosition'], attacker['townhallLevel'], attacker['name'],
         defender['mapPosition'], defender['townhallLevel'], defender['name'],
         ':star:' * attack['stars'], attack['destructionPercentage'])
@@ -108,7 +109,7 @@ async def handle_new_defense(attack, players):
         return
     attacker = players[attack['attackerTag']]
     defender = players[attack['defenderTag']]
-    message_content = '{}. th{} {} defends {}. th{} {} for {} %{}'.format(
+    message_content = '{}. th{} {} defends {}. th{} {} for {} {}%'.format(
         defender['mapPosition'], defender['townhallLevel'], defender['name'],
         attacker['mapPosition'], attacker['townhallLevel'], attacker['name'],
         ':star:' * attack['stars'], attack['destructionPercentage'])
@@ -191,6 +192,7 @@ async def refresh_current_war():
                     new_offset = attack['order']
 
     g_ops_datas.attack_log_offset = new_offset
+    print("[{}] update war data complete. curent offset = {}".format(datetime.datetime.now(), new_offset))
 
     for tag in tag_2_player:
         player = tag_2_player[tag]
