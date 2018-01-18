@@ -3,6 +3,8 @@ import asyncio
 import json
 import functools
 import requests
+import traceback
+import concurrent.futures
 
 CONFIG_FILE_PATH = 'config.json'
 CHECKPOINT_FILE_PATH = 'checkpoint.json'
@@ -187,8 +189,14 @@ async def refresh_current_war():
     await wait_task_list(async_tasks)
 
 async def periodic_task(interval, task):
-    await asyncio.sleep(interval)
-    await task
+    try:
+        await asyncio.sleep(interval)
+        await task
+    except KeyboardInterrupt, concurrent.futures.CancelledError:
+        raise
+    except:
+        traceback.print_exc()
+
     global g_ops_datas
     g_ops_datas.background_refresh_task = asyncio.ensure_future(periodic_task(interval, task))
 
