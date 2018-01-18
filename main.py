@@ -86,6 +86,10 @@ def fetch_current_war():
     response = r.json()
     return response
 
+async def wait_task_list(task_list):
+    for task in task_list:
+        await task
+
 async def handle_new_attack(attack, players):
     attacker = players[attack['attackerTag']]
     defender = players[attack['defenderTag']]
@@ -144,13 +148,15 @@ async def refresh_current_war():
     if g_ops_datas.attack_log_offset is None:
         g_ops_datas.attack_log_offset = 0
 
+    async_tasks = []
+
     new_offset = g_ops_datas.attack_log_offset
     for member in response['clan']['members']:
         if "attacks" not in member:
             continue
         for attack in member['attacks']:
             if attack['order'] > g_ops_datas.attack_log_offset:
-                await handle_new_attack(attack, tag_2_player)
+                async_tasks.append(handle_new_attack(attack, tag_2_player))
                 if new_offset < attack['order']:
                     new_offset = attack['order']
 
@@ -159,7 +165,7 @@ async def refresh_current_war():
             continue
         for attack in member['attacks']:
             if attack['order'] > g_ops_datas.attack_log_offset:
-                await handle_new_defense(attack, tag_2_player)
+                async_tasks.append(handle_new_defense(attack, tag_2_player))
                 if new_offset < attack['order']:
                     new_offset = attack['order']
 
@@ -168,7 +174,9 @@ async def refresh_current_war():
     for tag in tag_2_player:
         player = tag_2_player[tag]
         if player['needRefresh']:
-            await refresh_war_channel(player)
+            async_tasks.append(refresh_war_channel(player))
+
+    await wait_task_list(async_tasks)
 
 async def periodic_task(interval, task):
     await asyncio.sleep(interval)
