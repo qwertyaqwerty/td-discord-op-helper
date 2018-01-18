@@ -21,6 +21,8 @@ class OpsDatas:
         self.attack_log_offset = None
         self.clan_tag = None
         self.background_refresh_task = None
+        self.posthit_channel = None
+        self.war_status = None
 
 global g_ops_datas
 g_ops_datas = OpsDatas()
@@ -81,7 +83,6 @@ async def handle_mb_message(message):
     print(message.content)
 
 def fetch_current_war():
-    print('fetching from api...')
     url = 'https://api.clashofclans.com/v1/clans/%23{}/currentwar'.format(g_ops_datas.clan_tag)
     r = requests.get(url, headers={'Accept': 'application/json', 'authorization': 'Bearer {}'.format(coc_api_token)})
     r.raise_for_status()
@@ -92,22 +93,26 @@ async def wait_task_list(task_list):
     await asyncio.gather(*task_list)
 
 async def handle_new_attack(attack, players):
+    if g_ops_datas.posthit_channel is None:
+        return
     attacker = players[attack['attackerTag']]
     defender = players[attack['defenderTag']]
     message_content = '{}. th{} {} attacks {}. th{} {} for {} %{}'.format(
         attacker['mapPosition'], attacker['townhallLevel'], attacker['name'],
         defender['mapPosition'], defender['townhallLevel'], defender['name'],
         ':star:' * attack['stars'], attack['destructionPercentage'])
-    await client.send_message(g_ops_datas.restricted_channel, message_content)
+    await client.send_message(g_ops_datas.posthit_channel, message_content)
 
 async def handle_new_defense(attack, players):
+    if g_ops_datas.posthit_channel is None:
+        return
     attacker = players[attack['attackerTag']]
     defender = players[attack['defenderTag']]
     message_content = '{}. th{} {} defends {}. th{} {} for {} %{}'.format(
         defender['mapPosition'], defender['townhallLevel'], defender['name'],
         attacker['mapPosition'], attacker['townhallLevel'], attacker['name'],
         ':star:' * attack['stars'], attack['destructionPercentage'])
-    await client.send_message(g_ops_datas.restricted_channel, message_content)
+    await client.send_message(g_ops_datas.posthit_channel, message_content)
 
 async def refresh_war_channel(player):
     if player['side'] != 'opponent':
@@ -132,12 +137,23 @@ async def refresh_war_channel(player):
     global g_ops_datas
     await client.edit_channel(g_ops_datas.channels[pos - 1], name=new_name)
 
+async def handle_war_state_change(state, data):
+    if g_ops_datas.posthit_channel is None:
+        return
+
+    if state == "preparation":
+        await client.send_message(g_ops_datas.posthit_channel, 'War has been declared against {}'.format(data['opponent']['name']))
+    elif state == "warEnded":
+        await client.send_message(g_ops_datas.posthit_channel, 'War with {} ended!'.format(data['opponent']['name']))
+    elif state == "inWar":
+        await client.send_message(g_ops_datas.posthit_channel, 'War with {} started!'.format(data['opponent']['name']))
+
 async def refresh_current_war():
     global g_ops_datas
 
     response = fetch_current_war()
 
-    if response["state"] != "inWar":
+    if response["state"] == "notInWar":
         g_ops_datas.attack_log_offset = None
         return
 
@@ -175,7 +191,6 @@ async def refresh_current_war():
                     new_offset = attack['order']
 
     g_ops_datas.attack_log_offset = new_offset
-    print('update data complete, new_offset = {}'.format(new_offset))
 
     for tag in tag_2_player:
         player = tag_2_player[tag]
@@ -183,6 +198,10 @@ async def refresh_current_war():
             async_tasks.append(refresh_war_channel(player))
 
     await wait_task_list(async_tasks)
+
+    if response["state"] != g_ops_datas.war_status:
+        g_ops_datas.war_status = response["state"]
+        await handle_war_state_change(response["state"], response)
 
 async def periodic_task(interval, task_func):
     try:
@@ -346,6 +365,15 @@ async def on_message(message):
         if g_ops_datas.background_refresh_task is None:
             g_ops_datas.background_refresh_task = asyncio.ensure_future(periodic_task(refresh_interval, refresh_current_war()))
         await client.send_message(message.channel, 'clan tag set to {}'.format(clan_tag))
+    elif message.content.startswith('!set_posthit_channel'):
+        channel_id = message.content.split(' ')[1]
+        global g_ops_datas
+        g_ops_datas.posthit_channel = client.get_channel(channel_id)
+        await client.send_message(message.channel, 'post hit channel set to `{}`: `{}`'.format(
+            g_ops_datas.posthit_channel.id, g_ops_datas.posthit_channel.name))
+    elif message.content.startswith('!refresh_war'):
+        await asyncio.gather(client.send_message(message.channel, 'refreshing...'), refresh_current_war())
+        await client.send_message(message.channel, 'refresh complete')
     else:
         await client.send_message(message.channel, 'Prefix not recognized.')
 
@@ -369,6 +397,10 @@ def load_checkpoint(checkpoint_file_path):
         g_ops_datas.attack_log_offset = config["attack_log_offset"]
     if "clan_tag" in config:
         g_ops_datas.clan_tag = config["clan_tag"]
+    if "posthit_channel" in config:
+        g_ops_datas.posthit_channel = client.get_channel(config["posthit_channel"])
+    if "war_status" in config:
+        g_ops_datas.war_status = config["war_status"]
 
 def save_checkpoint(checkpoint_file_path):
     config = {}
@@ -385,6 +417,10 @@ def save_checkpoint(checkpoint_file_path):
         config["attack_log_offset"] = g_ops_datas.attack_log_offset
     if g_ops_datas.clan_tag is not None:
         config["clan_tag"] = g_ops_datas.clan_tag
+    if g_ops_datas.posthit_channel is not None:
+        config["posthit_channel"] = g_ops_datas.posthit_channel.id
+    if g_ops_datas.war_status is not None:
+        config["war_status"] = g_ops_datas.war_status
 
     with open(checkpoint_file_path, 'w') as f:
         f.write(json.dumps(config, indent=4))
