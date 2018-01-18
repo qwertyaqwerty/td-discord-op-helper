@@ -116,18 +116,14 @@ async def refresh_war_channel(player):
     print('refreshing channel for player...{}'.format(player['mapPosition']))
 
     stars = player['bestOpponentAttack']['stars']
-    print(stars)
     cleared = stars == 3 or (player['townhallLevel'] == 11 and stars >= 2)
-    print(cleared)
     defs = player['opponentAttacks']
-    print(defs)
     if defs == 0:
         status = ''
     elif cleared:
         status = '-cleared'
     else:
-        status = '-0/{}'.format(defs)
-    print(status)
+        status = '-{}'.format(defs)
     pos = player['mapPosition']
 
     new_name = '{}-th{}{}'.format(pos, player['townhallLevel'], status)
@@ -188,17 +184,17 @@ async def refresh_current_war():
 
     await wait_task_list(async_tasks)
 
-async def periodic_task(interval, task):
+async def periodic_task(interval, task_func):
     try:
         await asyncio.sleep(interval)
-        await task
-    except KeyboardInterrupt, concurrent.futures.CancelledError:
+        await task_func()
+    except (KeyboardInterrupt, concurrent.futures.CancelledError):
         raise
     except:
         traceback.print_exc()
 
     global g_ops_datas
-    g_ops_datas.background_refresh_task = asyncio.ensure_future(periodic_task(interval, task))
+    g_ops_datas.background_refresh_task = asyncio.ensure_future(periodic_task(interval, task_func))
 
 @client.event
 async def on_ready():
@@ -216,7 +212,7 @@ async def on_ready():
 
     if g_ops_datas.clan_tag is not None:
         print('set up refresh...')
-        g_ops_datas.background_refresh_task = asyncio.ensure_future(periodic_task(refresh_interval, refresh_current_war()))
+        g_ops_datas.background_refresh_task = asyncio.ensure_future(periodic_task(refresh_interval, refresh_current_war))
 
 @client.event
 async def on_message(message):
