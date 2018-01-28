@@ -156,7 +156,24 @@ async def refresh_current_war():
 
     if response["state"] == "notInWar":
         g_ops_datas.attack_log_offset = None
+        g_ops_datas.war_status = response['state']
+        print('[{}] refresh complete. not in war.'.format(datetime.datetime.now()))
         return
+
+    if response['state'] == 'preparation':
+        if g_ops_datas.war_status != response['state']:
+            g_ops_datas.war_status = response['state']
+            await handle_war_state_change(response['state'], response)
+        g_ops_datas.attack_log_offset = 0
+        print('[{}] refresh complete. preparation.'.format(datetime.datetime.now()))
+        return
+
+    first_refresh = False
+    if response['state'] == 'inWar':
+        if g_ops_datas.war_status != response['state']:
+            g_ops_datas.war_status = response['state']
+            first_refresh = True
+            await handle_war_state_change(response['state'], response)
 
     tag_2_player = {}
     for side in ['clan', 'opponent']:
@@ -196,7 +213,7 @@ async def refresh_current_war():
 
     for tag in tag_2_player:
         player = tag_2_player[tag]
-        if player['needRefresh']:
+        if first_refresh or player['needRefresh']:
             async_tasks.append(refresh_war_channel(player))
 
     await wait_task_list(async_tasks)
@@ -252,19 +269,24 @@ async def on_message(message):
         if g_ops_datas.channel_parent_id is None:
             await client.send_message(message.channel, 'parent_id not set!')
             return
-        args = message.content.split(' ')[1:]
+
+        if g_ops_datas.clan_tag is None:
+            await client.send_message(message.channel, 'clan tag not set!')
+            return
+
+        response = fetch_current_war()
+        if response['state'] == 'notInWar':
+            await client.send_message(message.channel, 'not in war!')
+            return
+
+        size = response['teamSize']
         global g_ops_datas
         async_tasks = []
-        idx = 0
-        for i, arg in enumerate(args):
-            th = 11 - i
-            num = int(arg)
-            for j in range(0, num):
-                idx += 1
-                async_tasks.append(client.create_channel(message.server, "{}-th{}".format(idx, th), parent_id=g_ops_datas.channel_parent_id))
+        for i in range(0, size):
+            async_tasks.append(client.create_channel(message.server, "{}-".format(i+1), parent_id=g_ops_datas.channel_parent_id))
         for async_task in async_tasks:
             g_ops_datas.channels.append(await async_task)
-        await client.send_message(message.channel, "{} channels created!".format(idx))
+        await client.send_message(message.channel, "{} channels created!".format(size))
     elif message.content.startswith('!channel_info'):
         message_content = 'Channel id: `{id}`, Channel position: `{pos}`, parent id: `{parent}`'
         await client.send_message(message.channel, message_content.format(
@@ -365,7 +387,7 @@ async def on_message(message):
         g_ops_datas.clan_tag = clan_tag
         g_ops_datas.attack_log_offset = None
         if g_ops_datas.background_refresh_task is None:
-            g_ops_datas.background_refresh_task = asyncio.ensure_future(periodic_task(refresh_interval, refresh_current_war()))
+            g_ops_datas.background_refresh_task = asyncio.ensure_future(periodic_task(refresh_interval, refresh_current_war))
         await client.send_message(message.channel, 'clan tag set to {}'.format(clan_tag))
     elif message.content.startswith('!set_posthit_channel'):
         channel_id = message.content.split(' ')[1]
