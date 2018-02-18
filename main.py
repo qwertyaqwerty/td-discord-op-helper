@@ -8,6 +8,7 @@ import concurrent.futures
 import datetime
 import random
 import string
+import aiohttp
 
 CONFIG_FILE_PATH = 'config.json'
 CHECKPOINT_FILE_PATH = 'checkpoint.json'
@@ -88,10 +89,10 @@ async def handle_mb_message(message):
 def fetch_current_war():
     random_str = ''.join([random.choice(string.ascii_letters + string.digits) for i in range(6)])
     url = 'https://api.clashofclans.com/v1/clans/%23{}/currentwar?rns={}'.format(g_ops_datas.clan_tag, random_str)
-    r = requests.get(url, headers={'Accept': 'application/json', 'authorization': 'Bearer {}'.format(coc_api_token)})
-    r.raise_for_status()
-    response = r.json()
-    return response
+    async with aiohttp.get(url, headers={'Accept': 'application/json', 'authorization': 'Bearer {}'.format(coc_api_token)}) as r:
+        r.raise_for_status()
+        response = await r.json()
+        return response
 
 async def wait_task_list(task_list):
     await asyncio.gather(*task_list)
