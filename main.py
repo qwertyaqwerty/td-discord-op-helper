@@ -6,6 +6,8 @@ import requests
 import traceback
 import concurrent.futures
 import datetime
+import random
+import string
 
 CONFIG_FILE_PATH = 'config.json'
 CHECKPOINT_FILE_PATH = 'checkpoint.json'
@@ -84,7 +86,8 @@ async def handle_mb_message(message):
     print(message.content)
 
 def fetch_current_war():
-    url = 'https://api.clashofclans.com/v1/clans/%23{}/currentwar'.format(g_ops_datas.clan_tag)
+    random_str = ''.join([random.choice(string.ascii_letters + string.digits) for i in range(6)])
+    url = 'https://api.clashofclans.com/v1/clans/%23{}/currentwar?rns={}'.format(g_ops_datas.clan_tag, random_str)
     r = requests.get(url, headers={'Accept': 'application/json', 'authorization': 'Bearer {}'.format(coc_api_token)})
     r.raise_for_status()
     response = r.json()
@@ -98,7 +101,7 @@ async def handle_new_attack(attack, players):
         return
     attacker = players[attack['attackerTag']]
     defender = players[attack['defenderTag']]
-    message_content = '{}. th{} {} attacks {}. th{} {} for {} {}%'.format(
+    message_content = '{}. th{} {} attacks:crossed_swords: {}. th{} {} for {} {}%'.format(
         attacker['mapPosition'], attacker['townhallLevel'], attacker['name'],
         defender['mapPosition'], defender['townhallLevel'], defender['name'],
         ':star:' * attack['stars'], attack['destructionPercentage'])
@@ -109,7 +112,7 @@ async def handle_new_defense(attack, players):
         return
     attacker = players[attack['attackerTag']]
     defender = players[attack['defenderTag']]
-    message_content = '{}. th{} {} defends {}. th{} {} for {} {}%'.format(
+    message_content = '{}. th{} {} defends:shield: {}. th{} {} for {} {}%'.format(
         defender['mapPosition'], defender['townhallLevel'], defender['name'],
         attacker['mapPosition'], attacker['townhallLevel'], attacker['name'],
         ':star:' * attack['stars'], attack['destructionPercentage'])
@@ -121,15 +124,16 @@ async def refresh_war_channel(player):
 
     print('refreshing channel for player...{}'.format(player['mapPosition']))
 
-    stars = player['bestOpponentAttack']['stars']
-    cleared = stars == 3 or (player['townhallLevel'] == 11 and stars >= 2)
     defs = player['opponentAttacks']
     if defs == 0:
         status = ''
-    elif cleared:
-        status = '-cleared'
     else:
-        status = '-{}'.format(defs)
+        stars = player['bestOpponentAttack']['stars']
+        cleared = stars == 3 or (player['townhallLevel'] == 11 and stars >= 2)
+        if cleared:
+            status = '-cleared'
+        else:
+            status = '-{}'.format(defs)
     pos = player['mapPosition']
 
     new_name = '{}-th{}{}'.format(pos, player['townhallLevel'], status)
@@ -316,6 +320,8 @@ async def on_message(message):
                 async_tasks.append(client.delete_channel(channel))
         for async_task in async_tasks:
             await async_task
+        global g_ops_datas
+        g_ops_datas.channels = []
         await client.send_message(message.channel, 'channels deleted!')
     elif message.content.startswith('!send_war_messages'):
         if g_ops_datas.channel_parent_id is None:
