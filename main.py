@@ -86,7 +86,7 @@ async def handle_mb_message(message):
         # 'recieved message from minion bot:\n```\n{}\n```\nembeds: {}\nattachments:{}\n'.format(message.content, message.embeds, message.attachments))
     print(message.content)
 
-def fetch_current_war():
+async def fetch_current_war():
     random_str = ''.join([random.choice(string.ascii_letters + string.digits) for i in range(6)])
     url = 'https://api.clashofclans.com/v1/clans/%23{}/currentwar?rns={}'.format(g_ops_datas.clan_tag, random_str)
     async with aiohttp.get(url, headers={'Accept': 'application/json', 'authorization': 'Bearer {}'.format(coc_api_token)}) as r:
@@ -157,7 +157,7 @@ async def handle_war_state_change(state, data):
 async def refresh_current_war():
     global g_ops_datas
 
-    response = fetch_current_war()
+    response = await fetch_current_war()
 
     if response["state"] == "notInWar":
         g_ops_datas.attack_log_offset = None
