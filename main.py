@@ -279,7 +279,7 @@ async def on_message(message):
             await client.send_message(message.channel, 'clan tag not set!')
             return
 
-        response = fetch_current_war()
+        response = await fetch_current_war()
         if response['state'] == 'notInWar':
             await client.send_message(message.channel, 'not in war!')
             return
