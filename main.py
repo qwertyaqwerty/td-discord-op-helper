@@ -65,6 +65,8 @@ async def check_message(message):
             'recieved message from channel id: `{}` `{}`, user id:`{}` name:`{}`:\n```\n{}\n```\nembeds: {}\nattachments:{}\n'.format(
                 message.channel.id, message.channel.name, message.author.id, message.author.name, message.content, message.embeds,
                 message.attachments))
+        print(message.embeds)
+        print(message.attachments)
 
     if message.author.id == wm_bot_id:
         return True
@@ -253,6 +255,9 @@ async def on_ready():
     except:
         print('checkpoint not exist.')
 
+    print('set up checkpoint...')
+    g_ops_datas.save_checkpoint_task = asyncio.ensure_future(periodic_task(10, save_checkpoint))
+
     if g_ops_datas.clan_tag is not None:
         print('set up refresh...')
         g_ops_datas.background_refresh_task = asyncio.ensure_future(periodic_task(refresh_interval, refresh_current_war))
@@ -433,7 +438,7 @@ def load_checkpoint(checkpoint_file_path):
     if "war_status" in config:
         g_ops_datas.war_status = config["war_status"]
 
-def save_checkpoint(checkpoint_file_path):
+async def save_checkpoint(checkpoint_file_path=CHECKPOINT_FILE_PATH):
     config = {}
     if g_ops_datas.channel_parent_id is not None:
         config["channel_parent_id"] = g_ops_datas.channel_parent_id
